@@ -1,10 +1,10 @@
 .app-shell {
   --circle-icon-size: 1.1rem;
-  --active-bg: rgba(74, 78, 83, 0.94);
+  --active-bg: rgba(74, 78, 83, 0.4);
   --ai-accent: #EC6602;
   --active-orange: #EC6602;
   --resolved-green: #2b9f67;
-  --section-bg: #333333;
+  --section-bg: #202020;
   --card-hover-bg: rgba(255, 255, 255, 0.05);
   --dropdown-bg: #414141;
   --txt-white: #ffffffff;

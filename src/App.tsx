@@ -6,6 +6,9 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react'
 import bodyPuppetImage from './assets/VA11A+ (Future concept with image viewer)/puppet/body.svg'
+import lungsImage from './assets/lungs.svg'
+import lung01Image from './assets/images/lung01.png'
+import aircScImage from './assets/images/airc_sc.jpg'
 import './App.css'
 
 const STARTING_WIDTHS = [24, 48, 28]
@@ -326,13 +329,6 @@ const createImageFindings = (thumbnailId: string, count: number): ImageFinding[]
     }
   })
 
-const IMAGE_FINDINGS_BY_THUMBNAIL: Record<string, ImageFinding[]> = Object.fromEntries(
-  THUMBNAILS.map((thumbnail) => [
-    thumbnail.id,
-    createImageFindings(thumbnail.id, IMAGE_FINDING_COUNTS[thumbnail.id] ?? 3),
-  ]),
-) as Record<string, ImageFinding[]>
-
 const LAYOUT_PRESETS = [
   'Polytrauma',
   'Lung Screening',
@@ -341,6 +337,8 @@ const LAYOUT_PRESETS = [
   'Staging scans',
   'Saved custom layout name',
 ]
+
+type LayoutPreset = (typeof LAYOUT_PRESETS)[number]
 
 const DEDICATED_LAYOUT_OPTIONS = ['2x1 Stack', '3x3 Stack', '1x1 Stack'] as const
 
@@ -488,10 +486,162 @@ type CaseTab = {
   meta: string
 }
 
+type CaseWorkspaceData = {
+  findings: Finding[]
+  thumbnails: Thumbnail[]
+  studyTree: StudyTreeNode[]
+  thumbnailGroups: ThumbnailGroup[]
+  imageFindingCounts: Record<string, number>
+  anatomyVisualization: 'body' | 'lungs'
+  puppetBadgeDots: Array<{
+    findingId: string
+    region: string
+    top: string
+    left: string
+  }>
+  defaultFindingId: string
+  defaultThumbnailId: string
+  defaultLayoutPreset: LayoutPreset
+}
+
 const CASE_TABS: CaseTab[] = [
-  { id: 'case-1', name: 'Ron Swanson', meta: '1966/12/31 M 7...' },
+  { id: 'case-1', name: 'Ron Swanson', meta: '1966/12/31 M 71Y' },
   { id: 'case-2', name: 'April Ludgate', meta: '03/28/1989 F 37Y' },
 ]
+
+const CASE_WORKSPACE_DATA: Record<CaseTabId, CaseWorkspaceData> = {
+  'case-1': {
+    findings: FINDINGS,
+    thumbnails: THUMBNAILS,
+    studyTree: STUDY_TREE,
+    thumbnailGroups: THUMBNAIL_GROUPS,
+    imageFindingCounts: IMAGE_FINDING_COUNTS,
+    anatomyVisualization: 'body',
+    puppetBadgeDots: [
+      { findingId: 'brain-hemorrhage', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% - 22px)' },
+      { findingId: 'midline-shift', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% - 6px)' },
+      { findingId: 'skull-fracture', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% + 10px)' },
+      { findingId: 'cervical-spine-fracture', region: 'head-neck', top: 'calc(22% - 64px)', left: 'calc(50% - 4px)' },
+      { findingId: 'pelvic-free-fluid', region: 'abdomen', top: 'calc(57% - 64px)', left: 'calc(54% - 6px)' },
+      { findingId: 'possible-tibia-fracture', region: 'lower-ext', top: 'calc(80% - 64px)', left: 'calc(52% - 6px)' },
+    ],
+    defaultFindingId: 'brain-hemorrhage',
+    defaultThumbnailId: 'thumb-1',
+    defaultLayoutPreset: 'Polytrauma',
+  },
+  'case-2': {
+    findings: [
+      {
+        id: 'thorax-lung-nodules',
+        title: 'Lung nodules',
+        summary: 'Single frontal chest image with a suspicious right upper lobe pulmonary nodule.',
+        metric: 'IMG_01',
+        nodeId: 'tx-lung-nodules',
+      },
+      {
+        id: 'thorax-pulmonary-density',
+        title: 'Pulmonary density',
+        summary: 'Focal right lower lobe pulmonary density suspicious for a consolidative opacity.',
+        metric: 'IMG_02',
+        nodeId: 'tx-pulmonary-density',
+      },
+    ],
+    thumbnails: [
+      {
+        id: 'thumb-case2-thorax-1',
+        findingId: 'thorax-lung-nodules',
+        label: '1 • Thorax lung nodules',
+        variant: 'midline',
+      },
+      {
+        id: 'thumb-case2-thorax-2',
+        findingId: 'thorax-pulmonary-density',
+        label: '1 • Pulmonary density',
+        variant: 'midline',
+      },
+      {
+        id: 'thumb-case2-thorax-3',
+        findingId: 'thorax-lung-nodules',
+        label: '2 • Thorax lung nodules',
+        variant: 'midline',
+      },
+      {
+        id: 'thumb-case2-thorax-4',
+        findingId: 'thorax-lung-nodules',
+        label: '3 • Thorax lung nodules',
+        variant: 'midline',
+      },
+    ],
+    studyTree: [
+      {
+        id: 'ct-thorax-main',
+        label: 'CT [2026/12/31], 09:14',
+        count: 2,
+        children: [
+          {
+            id: 'airc',
+            label: 'Chest CT',
+            badges: [{ value: 2, tone: 'info' }],
+            children: [
+              {
+                id: 'tx-lung-nodules',
+                label: 'Lung nodules',
+                count: 1,
+                metricValue: 'IMG_01',
+                findingId: 'thorax-lung-nodules',
+                thumbnailId: 'thumb-case2-thorax-1',
+              },
+              {
+                id: 'tx-pulmonary-density',
+                label: 'Pulmonary density',
+                count: 1,
+                metricValue: 'IMG_02',
+                findingId: 'thorax-pulmonary-density',
+                thumbnailId: 'thumb-case2-thorax-2',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    thumbnailGroups: [
+      {
+        id: 'airc-chest-ct-lung-nodules',
+        title: 'AIRC - Chest CT / Lung nodules',
+        findingIds: ['thorax-lung-nodules'],
+      },
+      {
+        id: 'airc-chest-ct-pulmonary-density',
+        title: 'AIRC - Chest CT / Pulmonary density',
+        findingIds: ['thorax-pulmonary-density'],
+      },
+    ],
+    imageFindingCounts: {
+      'thumb-case2-thorax-1': 1,
+      'thumb-case2-thorax-2': 1,
+      'thumb-case2-thorax-3': 1,
+      'thumb-case2-thorax-4': 1,
+    },
+    anatomyVisualization: 'lungs',
+    puppetBadgeDots: [
+      {
+        findingId: 'thorax-lung-nodules',
+        region: 'thorax',
+        top: '30%',
+        left: '22%',
+      },
+      {
+        findingId: 'thorax-pulmonary-density',
+        region: 'thorax',
+        top: '58%',
+        left: '78%',
+      },
+    ],
+    defaultFindingId: 'thorax-lung-nodules',
+    defaultThumbnailId: 'thumb-case2-thorax-1',
+    defaultLayoutPreset: 'Lung Screening',
+  },
+}
 
 const WORKLIST_ROWS: WorklistRow[] = [
   {
@@ -535,7 +685,7 @@ const WORKLIST_ROWS: WorklistRow[] = [
       'Pellentesque reprehenderit senectus iure cupidatat exercitation voluptate veniam consectetur officia duis sit amet q...',
     protocol: 'Stroke',
     markers: [{ value: 1, tone: 'critical' }],
-    state: 'new',
+    state: 'processing',
   },
   {
     id: 'wl-tammy-swanson-ii',
@@ -964,6 +1114,7 @@ function App() {
   const suppressNextResultCardClickRef = useRef(false)
   const resultCardRefs = useRef<Record<string, HTMLElement | null>>({})
   const reviewImageCardRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const viewerFrameRef = useRef<HTMLDivElement>(null)
   const keyboardFindingNavigationRef = useRef(false)
   const viewerPanStateRef = useRef<ViewerPanState | null>(null)
   const [sectionWidths, setSectionWidths] = useState(STARTING_WIDTHS)
@@ -976,7 +1127,16 @@ function App() {
   const [activeThumbnailId, setActiveThumbnailId] = useState('thumb-1')
   const [isViewerOpen, setIsViewerOpen] = useState(false)
   const [isViewerFullscreen, setIsViewerFullscreen] = useState(false)
-  const [isViewerFilmstripVisible, setIsViewerFilmstripVisible] = useState(true)
+  const [filmstripVisibilityByLayout, setFilmstripVisibilityByLayout] = useState<
+    Record<LayoutPreset, boolean>
+  >({
+    Polytrauma: true,
+    'Lung Screening': false,
+    'Cardiac evaluations': true,
+    Stroke: true,
+    'Staging scans': true,
+    'Saved custom layout name': true,
+  })
   const [isDedicatedViewerOpen, setIsDedicatedViewerOpen] = useState(false)
   const [activeDedicatedLeftTab, setActiveDedicatedLeftTab] = useState<DedicatedLeftTab>('images')
   const [isStudyPickerOpen, setIsStudyPickerOpen] = useState(false)
@@ -994,7 +1154,10 @@ function App() {
   const [isGroupedThumbView, setIsGroupedThumbView] = useState(false)
   const [showResultThumbnails, setShowResultThumbnails] = useState(true)
   const [isLayoutAutoDetect, setIsLayoutAutoDetect] = useState(true)
-  const [activeLayoutPreset, setActiveLayoutPreset] = useState('Polytrauma')
+  const [layoutPresetByCase, setLayoutPresetByCase] = useState<Record<CaseTabId, LayoutPreset>>({
+    'case-1': CASE_WORKSPACE_DATA['case-1'].defaultLayoutPreset,
+    'case-2': CASE_WORKSPACE_DATA['case-2'].defaultLayoutPreset,
+  })
   const [activeDedicatedLayout, setActiveDedicatedLayout] =
     useState<DedicatedLayoutOption>('1x1 Stack')
   const [activeStateOptionId, setActiveStateOptionId] = useState('opened')
@@ -1018,8 +1181,27 @@ function App() {
     panX: 0,
     panY: 0,
   })
+  const [viewerSquareSize, setViewerSquareSize] = useState<number | null>(null)
   const [selectedStudyIds, setSelectedStudyIds] = useState<string[]>(['ct-2026', 'ct-2025'])
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
+
+  const activeCaseTabId: CaseTabId = activeGlobalTab === 'case-2' ? 'case-2' : 'case-1'
+  const caseData = CASE_WORKSPACE_DATA[activeCaseTabId]
+  const activeLayoutPreset = layoutPresetByCase[activeCaseTabId] ?? caseData.defaultLayoutPreset
+  const isViewerFilmstripVisible = filmstripVisibilityByLayout[activeLayoutPreset] ?? true
+  const isLungScreeningTemplate = activeLayoutPreset === 'Lung Screening'
+  const usesLungMap = isLungScreeningTemplate && caseData.anatomyVisualization === 'lungs'
+  const FINDINGS = caseData.findings
+  const THUMBNAILS = caseData.thumbnails
+  const STUDY_TREE = caseData.studyTree
+  const THUMBNAIL_GROUPS = caseData.thumbnailGroups
+  const IMAGE_FINDING_COUNTS = caseData.imageFindingCounts
+  const IMAGE_FINDINGS_BY_THUMBNAIL: Record<string, ImageFinding[]> = Object.fromEntries(
+    THUMBNAILS.map((thumbnail) => [
+      thumbnail.id,
+      createImageFindings(thumbnail.id, IMAGE_FINDING_COUNTS[thumbnail.id] ?? 3),
+    ]),
+  ) as Record<string, ImageFinding[]>
 
   const activeFinding =
     FINDINGS.find((finding) => finding.id === activeFindingId) ?? FINDINGS[0]
@@ -1029,6 +1211,32 @@ function App() {
     (thumbnail) => thumbnail.findingId === activeFinding.id,
   )
   const activeDedicatedFindings = IMAGE_FINDINGS_BY_THUMBNAIL[activeThumbnail.id] ?? []
+  const getThumbnailImageStyle = (thumbnailId: string): CSSProperties | undefined => {
+    if (
+      thumbnailId === 'thumb-case2-thorax-1' ||
+      thumbnailId === 'thumb-case2-thorax-3' ||
+      thumbnailId === 'thumb-case2-thorax-4'
+    ) {
+      return {
+        backgroundImage: `url(${lung01Image})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    }
+
+    if (thumbnailId === 'thumb-case2-thorax-2') {
+      return {
+        backgroundImage: `url(${aircScImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    }
+
+    return undefined
+  }
+
   const selectedDedicatedFindingState = selectedDedicatedFindingByThumbnail[activeThumbnail.id]
   const selectedDedicatedFindingId =
     selectedDedicatedFindingState === null
@@ -1040,22 +1248,105 @@ function App() {
     : MIN_SECTION_WIDTHS
   const visibleTreeNodes = STUDY_TREE[0]?.children ?? []
 
-  const puppetBadgeDots = [
-    { findingId: 'brain-hemorrhage', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% - 22px)' },
-    { findingId: 'midline-shift', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% - 6px)' },
-    { findingId: 'skull-fracture', region: 'head-neck', top: 'calc(12% - 64px)', left: 'calc(50% + 10px)' },
-    { findingId: 'cervical-spine-fracture', region: 'head-neck', top: 'calc(22% - 64px)', left: 'calc(50% - 4px)' },
-    { findingId: 'pelvic-free-fluid', region: 'abdomen', top: 'calc(57% - 64px)', left: 'calc(54% - 6px)' },
-    { findingId: 'possible-tibia-fracture', region: 'lower-ext', top: 'calc(80% - 64px)', left: 'calc(52% - 6px)' },
-  ].filter(({ findingId }) =>
-    FINDINGS.some((finding) => finding.id === findingId) &&
-    (findingId === 'brain-hemorrhage' ||
-      findingId === 'midline-shift' ||
-      findingId === 'skull-fracture' ||
-      findingId === 'cervical-spine-fracture' ||
-      findingId === 'pelvic-free-fluid' ||
-      findingId === 'possible-tibia-fracture'),
+  const puppetBadgeDots = caseData.puppetBadgeDots.filter(({ findingId }) =>
+    FINDINGS.some((finding) => finding.id === findingId),
   )
+
+  const selectLayoutPreset = (layoutPreset: LayoutPreset) => {
+    setLayoutPresetByCase((current) => ({
+      ...current,
+      [activeCaseTabId]: layoutPreset,
+    }))
+  }
+
+  const toggleFilmstripVisibility = () => {
+    setFilmstripVisibilityByLayout((current) => ({
+      ...current,
+      [activeLayoutPreset]: !(current[activeLayoutPreset] ?? true),
+    }))
+  }
+
+  const renderFindingMap = () => {
+    const anatomyImage = usesLungMap ? lungsImage : bodyPuppetImage
+    const anatomyClassName = usesLungMap ? 'lungs-map-svg' : 'body-puppet-svg'
+
+    return (
+      <div className={`body-outline ${usesLungMap ? 'body-outline-lungs' : ''}`}>
+        <div className={`body-silhouette-wrap ${usesLungMap ? 'lungs-silhouette-wrap' : ''}`}>
+          <img className={anatomyClassName} src={anatomyImage} alt="" />
+
+          <div className={`puppet-badges-layer ${usesLungMap ? 'lungs-badges-layer' : ''}`}>
+            {puppetBadgeDots.map(({ findingId, top, left }, index) => {
+              const isDotActive = activeFindingId === findingId && isViewerOpen
+
+              return (
+                <span
+                  key={`${findingId}-${index}`}
+                  className={`puppet-badge-hitbox ${isDotActive ? 'is-active' : ''}`}
+                  style={{ top, left }}
+                >
+                  <button
+                    type="button"
+                    className={`puppet-badge-dot ${isDotActive ? 'is-active' : ''}`}
+                    onClick={() => handlePuppetDotClick(findingId)}
+                    aria-label={`Select ${FINDINGS.find((entry) => entry.id === findingId)?.title ?? 'related finding'}`}
+                  />
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  useEffect(() => {
+    if (activeGlobalTab === 'quick') {
+      return
+    }
+
+    if (isLungScreeningTemplate) {
+      setIsGroupedThumbView(true)
+      return
+    }
+
+    setIsGroupedThumbView(false)
+  }, [activeGlobalTab, isLungScreeningTemplate])
+
+  useEffect(() => {
+    if (activeGlobalTab === 'quick') {
+      return
+    }
+
+    if (!FINDINGS.some((finding) => finding.id === activeFindingId)) {
+      setActiveFindingId(caseData.defaultFindingId)
+    }
+
+    if (!THUMBNAILS.some((thumbnail) => thumbnail.id === activeThumbnailId)) {
+      setActiveThumbnailId(caseData.defaultThumbnailId)
+    }
+
+    if (!selectedTreeRowId) {
+      return
+    }
+
+    const hasNode = (nodes: StudyTreeNode[], nodeId: string): boolean =>
+      nodes.some((node) => node.id === nodeId || hasNode(node.children ?? [], nodeId))
+
+    if (!hasNode(STUDY_TREE, selectedTreeRowId)) {
+      setSelectedTreeRowId(null)
+    }
+  }, [
+    activeGlobalTab,
+    FINDINGS,
+    THUMBNAILS,
+    STUDY_TREE,
+    activeFindingId,
+    activeThumbnailId,
+    selectedTreeRowId,
+    caseData.defaultFindingId,
+    caseData.defaultThumbnailId,
+  ])
 
   const handlePuppetDotClick = (findingId: string) => {
     const finding = FINDINGS.find((entry) => entry.id === findingId)
@@ -1073,6 +1364,17 @@ function App() {
 
   const selectViewerThumbnail = (direction: -1 | 1) => {
     if (THUMBNAILS.length === 0) {
+      return
+    }
+
+    if (!selectedTreeRowId && !isViewerOpen) {
+      const firstFinding = FINDINGS[0]
+      if (!firstFinding) {
+        return
+      }
+
+      const firstThumbnail = THUMBNAILS.find((thumbnail) => thumbnail.findingId === firstFinding.id)
+      openViewer(firstFinding.id, firstFinding.nodeId, firstThumbnail?.id)
       return
     }
 
@@ -1134,10 +1436,6 @@ function App() {
   }
 
   useEffect(() => {
-    if (!isViewerOpen) {
-      return
-    }
-
     const handleWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
         return
@@ -1154,13 +1452,28 @@ function App() {
         return
       }
 
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        return
+      }
+
+      if (!selectedTreeRowId && !isViewerOpen) {
+        const firstFinding = FINDINGS[0]
+        if (!firstFinding) {
+          return
+        }
+
+        const firstThumbnail = THUMBNAILS.find((thumbnail) => thumbnail.findingId === firstFinding.id)
+        event.preventDefault()
+        keyboardFindingNavigationRef.current = true
+        openViewer(firstFinding.id, firstFinding.nodeId, firstThumbnail?.id)
+        return
+      }
+
+      event.preventDefault()
+      keyboardFindingNavigationRef.current = true
       if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        keyboardFindingNavigationRef.current = true
         selectViewerThumbnail(-1)
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        keyboardFindingNavigationRef.current = true
+      } else {
         selectViewerThumbnail(1)
       }
     }
@@ -1169,7 +1482,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleWindowKeyDown)
     }
-  }, [isViewerOpen, activeFinding.id, activeThumbnail.id, activeFindingThumbnails, activeThumbnail])
+  }, [isViewerOpen, selectedTreeRowId, activeFinding.id, activeThumbnail.id, activeFindingThumbnails, activeThumbnail])
 
   useEffect(() => {
     const handleRestartShortcut = (event: KeyboardEvent) => {
@@ -1252,6 +1565,24 @@ function App() {
   }, [activeFindingInfoModal])
 
   useEffect(() => {
+    if (!isViewerFullscreen) {
+      return
+    }
+
+    const handleViewerFullscreenEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setIsViewerFullscreen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleViewerFullscreenEscape)
+    return () => {
+      window.removeEventListener('keydown', handleViewerFullscreenEscape)
+    }
+  }, [isViewerFullscreen])
+
+  useEffect(() => {
     setViewerTransform({
       scale: VIEWER_MIN_SCALE,
       panX: 0,
@@ -1259,6 +1590,32 @@ function App() {
     })
     viewerPanStateRef.current = null
   }, [activeThumbnail.id, isViewerOpen])
+
+  useEffect(() => {
+    if (!isViewerOpen) {
+      return
+    }
+
+    const frameElement = viewerFrameRef.current
+    if (!frameElement) {
+      return
+    }
+
+    const updateViewerSquareSize = () => {
+      const nextSize = Math.max(0, Math.floor(Math.min(frameElement.clientWidth, frameElement.clientHeight) - 8))
+
+      setViewerSquareSize((current) => (current === nextSize ? current : nextSize))
+    }
+
+    updateViewerSquareSize()
+
+    const resizeObserver = new ResizeObserver(updateViewerSquareSize)
+    resizeObserver.observe(frameElement)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [isViewerOpen, activeThumbnail.id, isDedicatedViewerOpen])
 
   useEffect(() => {
     if (!isViewerOpen) {
@@ -1746,7 +2103,7 @@ function App() {
 
   const countItemsInFolder = (node: StudyTreeNode): number => {
     if (!node.children || node.children.length === 0) {
-      return 1
+      return node.count ?? 1
     }
 
     return node.children.reduce((total, child) => total + countItemsInFolder(child), 0)
@@ -1858,10 +2215,6 @@ function App() {
 
                   {node.metricValue ? (
                     <span className="tree-metric">{node.metricValue}</span>
-                  ) : null}
-
-                  {typeof node.count === 'number' ? (
-                    <span className="tree-count">{node.count}</span>
                   ) : null}
 
                 </button>
@@ -2510,7 +2863,7 @@ function App() {
               <span className="worklist-cell" role="columnheader">PID</span>
               <span className="worklist-cell" role="columnheader">Results preview</span>
               <span className="worklist-cell" role="columnheader">Protocol (Study descr...)</span>
-              <span className="worklist-cell" role="columnheader">Markers</span>
+              <span className="worklist-cell" role="columnheader">Findings</span>
               <span className="worklist-cell" role="columnheader">State</span>
             </div>
 
@@ -2527,6 +2880,8 @@ function App() {
               }
 
               const isOpenedCase = row.state === 'opened' && openCaseTabIds.includes(linkedCaseId)
+
+              const findingCount = row.markers.reduce((sum, marker) => sum + marker.value, 0)
 
               return (
                 <div
@@ -2556,20 +2911,17 @@ function App() {
                     {isProcessing ? (
                       <span className="worklist-marker-spinner" aria-label="Processing" />
                     ) : (
-                      row.markers.map((marker, markerIndex) => (
-                        <span
-                          key={`${row.id}-marker-${markerIndex}`}
-                          className={`worklist-marker worklist-marker-${marker.tone}`}
-                        >
-                          {marker.value}
-                        </span>
-                      ))
+                      <span className="worklist-findings-count">{findingCount}</span>
                     )}
                   </span>
                   <span className="worklist-cell" role="cell">
-                    <span className={`worklist-state-pill worklist-state-${row.state}`}>
-                      {WORKLIST_STATE_LABELS[row.state]}
-                    </span>
+                    {row.state === 'processing' ? (
+                      <span className="worklist-state-spinner" aria-label="Processing" />
+                    ) : (
+                      <span className={`worklist-state-pill worklist-state-${row.state}`}>
+                        {WORKLIST_STATE_LABELS[row.state]}
+                      </span>
+                    )}
                   </span>
                 </div>
               )
@@ -2841,32 +3193,7 @@ function App() {
                   <div className="study-tree-body">{renderTree(visibleTreeNodes)}</div>
                 </div>
 
-                <div className="body-outline">
-                  <div className="body-silhouette-wrap">
-                    <img className="body-puppet-svg" src={bodyPuppetImage} alt="" />
-
-                    <div className="puppet-badges-layer">
-                      {puppetBadgeDots.map(({ findingId, top, left }) => {
-                        const isDotActive = activeFindingId === findingId && isViewerOpen
-
-                        return (
-                          <span
-                            key={findingId}
-                            className={`puppet-badge-hitbox ${isDotActive ? 'is-active' : ''}`}
-                            style={{ top, left }}
-                          >
-                            <button
-                              type="button"
-                              className={`puppet-badge-dot ${isDotActive ? 'is-active' : ''}`}
-                              onClick={() => handlePuppetDotClick(findingId)}
-                              aria-label={`Select ${FINDINGS.find((entry) => entry.id === findingId)?.title ?? 'related finding'}`}
-                            />
-                          </span>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
+                {renderFindingMap()}
               </div>
             ) : null}
 
@@ -2882,7 +3209,7 @@ function App() {
                     }}
                     onClick={() => selectDedicatedThumbnail(thumbnail.id)}
                   >
-                    <div className={`thumb-image thumb-${thumbnail.id}`} />
+                    <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                     <p>{thumbnail.label}</p>
                   </button>
                 ))}
@@ -3064,7 +3391,7 @@ function App() {
                                         }}
                                         aria-label={`Open ${finding.title} image ${thumbnail.label}`}
                                       >
-                                        <span className={`thumb-image thumb-${thumbnail.id}`} />
+                                        <span className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                                       </button>
                                     ),
                                   )}
@@ -3129,83 +3456,83 @@ function App() {
               </div>
             </header>
 
-            <div className="dedicated-viewer-toolbar" aria-label="Viewer action bar">
-              <div className="dedicated-viewer-toolbar-group dedicated-viewer-toolbar-group-tools">
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Detection tools">
-                  assignment
-                </button>
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Notifications">
-                  notifications
-                </button>
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Collaboration">
-                  groups
-                </button>
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Help">
-                  help
-                </button>
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Settings">
-                  settings
-                </button>
-              </div>
-
-              <div className="dedicated-viewer-toolbar-group dedicated-viewer-layout-group" role="group" aria-label="Layout presets">
-                <div className="dedicated-viewer-layout-options" aria-label="Layout button options">
-                  {DEDICATED_LAYOUT_OPTIONS.map((layoutOption) => (
-                    <button
-                      key={layoutOption}
-                      type="button"
-                      className={`dedicated-viewer-layout-btn ${
-                        activeDedicatedLayout === layoutOption ? 'is-active' : ''
-                      }`}
-                      onClick={() => setActiveDedicatedLayout(layoutOption)}
-                    >
-                      <span className="dedicated-viewer-layout-dot" aria-hidden="true" />
-                      <span>{layoutOption}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="dedicated-viewer-layout-compact">
-                  <span
-                    className="material-symbols-outlined dedicated-viewer-layout-compact-icon"
-                    aria-hidden="true"
-                  >
-                    auto_awesome_mosaic
-                  </span>
-                  <select
-                    className="dedicated-viewer-layout-select"
-                    value={activeDedicatedLayout}
-                    onChange={(event) =>
-                      setActiveDedicatedLayout(event.target.value as DedicatedLayoutOption)
-                    }
-                    aria-label="Layout presets"
-                  >
-                    {DEDICATED_LAYOUT_OPTIONS.map((layoutOption) => (
-                      <option key={layoutOption} value={layoutOption}>
-                        {layoutOption}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="dedicated-viewer-toolbar-divider" aria-hidden="true" />
-
-              <div className="dedicated-viewer-toolbar-group dedicated-viewer-toolbar-group-actions">
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Discard">
-                  delete
-                </button>
-                <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Pause">
-                  pause
-                </button>
-                <button type="button" className="dedicated-viewer-save-btn" aria-label="Save and send">
-                  <span className="material-symbols-outlined" aria-hidden="true">check</span>
-                  <span>Save &amp; Send</span>
-                </button>
-              </div>
-            </div>
-
             <section className="viewer-screen" aria-label="Focused image viewer">
+              <div className="dedicated-viewer-toolbar" aria-label="Viewer action bar">
+                <div className="dedicated-viewer-toolbar-group dedicated-viewer-toolbar-group-tools">
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Detection tools">
+                    assignment
+                  </button>
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Notifications">
+                    notifications
+                  </button>
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Collaboration">
+                    groups
+                  </button>
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Help">
+                    help
+                  </button>
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Settings">
+                    settings
+                  </button>
+                </div>
+
+                <div className="dedicated-viewer-toolbar-group dedicated-viewer-layout-group" role="group" aria-label="Layout presets">
+                  <div className="dedicated-viewer-layout-options" aria-label="Layout button options">
+                    {DEDICATED_LAYOUT_OPTIONS.map((layoutOption) => (
+                      <button
+                        key={layoutOption}
+                        type="button"
+                        className={`dedicated-viewer-layout-btn ${
+                          activeDedicatedLayout === layoutOption ? 'is-active' : ''
+                        }`}
+                        onClick={() => setActiveDedicatedLayout(layoutOption)}
+                      >
+                        <span className="dedicated-viewer-layout-dot" aria-hidden="true" />
+                        <span>{layoutOption}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="dedicated-viewer-layout-compact">
+                    <span
+                      className="material-symbols-outlined dedicated-viewer-layout-compact-icon"
+                      aria-hidden="true"
+                    >
+                      auto_awesome_mosaic
+                    </span>
+                    <select
+                      className="dedicated-viewer-layout-select"
+                      value={activeDedicatedLayout}
+                      onChange={(event) =>
+                        setActiveDedicatedLayout(event.target.value as DedicatedLayoutOption)
+                      }
+                      aria-label="Layout presets"
+                    >
+                      {DEDICATED_LAYOUT_OPTIONS.map((layoutOption) => (
+                        <option key={layoutOption} value={layoutOption}>
+                          {layoutOption}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="dedicated-viewer-toolbar-divider" aria-hidden="true" />
+
+                <div className="dedicated-viewer-toolbar-group dedicated-viewer-toolbar-group-actions">
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Discard">
+                    delete
+                  </button>
+                  <button type="button" className="dedicated-viewer-toolbar-icon material-symbols-outlined" aria-label="Pause">
+                    pause
+                  </button>
+                  <button type="button" className="dedicated-viewer-save-btn" aria-label="Save and send">
+                    <span className="material-symbols-outlined" aria-hidden="true">check</span>
+                    <span>Save &amp; Send</span>
+                  </button>
+                </div>
+              </div>
+
               <div
                 className={`viewer-stage viewer-${activeThumbnail.id}`}
                 style={
@@ -3214,6 +3541,7 @@ function App() {
                     '--viewer-pan-x': `${viewerTransform.panX}px`,
                     '--viewer-pan-y': `${viewerTransform.panY}px`,
                     '--dot-inverse-scale': `${1 / viewerTransform.scale}`,
+                    '--viewer-square-size': viewerSquareSize ? `${viewerSquareSize}px` : undefined,
                   } as CSSProperties
                 }
                 onWheel={handleViewerWheel}
@@ -3225,6 +3553,7 @@ function App() {
               >
                 <div
                   className={`viewer-frame viewer-${activeThumbnail.id}`}
+                  ref={viewerFrameRef}
                   onPointerDown={handleViewerPointerDown}
                   onPointerMove={handleViewerPointerMove}
                   onPointerUp={finishViewerPan}
@@ -3257,7 +3586,7 @@ function App() {
                         } ${isAccepted ? 'is-accepted' : 'is-unaccepted'}`}
                         style={{ top: finding.top, left: finding.left }}
                         aria-label={`Select ${finding.label}`}
-                        title={finding.label.match(/^\[L\d+\]/)?.[0] ?? finding.label}
+                        title="*AI"
                         onMouseEnter={() => {
                           setHoveredDedicatedFindingByThumbnail((current) => ({
                             ...current,
@@ -3293,7 +3622,7 @@ function App() {
                           }`}
                           aria-hidden="true"
                         >
-                          {finding.label.match(/^\[L\d+\]/)?.[0] ?? finding.label}
+                          {`${finding.label} *AI`}
                         </span>
                       </button>
                     )
@@ -3364,7 +3693,7 @@ function App() {
                 const isUnreviewed = reviewStatus === undefined
                 const isDeleted = Boolean(deletedDedicatedFindings[statusKey])
                 const findingTitle = finding.label.replace(/^\[L\d+\]\s*/, '')
-                const titleSuffix = isUnreviewed ? ' - *AI finding' : ''
+                const showAiSuffix = isUnreviewed
                 const findingTitleStateClass = isAccepted
                   ? 'is-accepted'
                   : isRejected
@@ -3528,7 +3857,14 @@ function App() {
                           <div className="review-finding-main">
                             <span className="review-finding-index" aria-hidden="true">{`[L${index + 1}]`}</span>
                             <div className="review-finding-copy">
-                              <h3 className={findingTitleStateClass}>{`${findingTitle}${titleSuffix}`}</h3>
+                              <h3 className={findingTitleStateClass}>
+                                {findingTitle}
+                                {showAiSuffix ? (
+                                  <span className="review-finding-ai-suffix"> - *AI finding</span>
+                                ) : isAccepted ? (
+                                  <span> - Accepted</span>
+                                ) : null}
+                              </h3>
                               <p>{finding.description}</p>
                             </div>
                           </div>
@@ -3643,7 +3979,7 @@ function App() {
                         className="layout-drawer-row layout-drawer-row-option"
                         role="option"
                         aria-selected={isSelected}
-                        onClick={() => setActiveLayoutPreset(layoutPreset)}
+                        onClick={() => selectLayoutPreset(layoutPreset as LayoutPreset)}
                       >
                         <span className={`layout-radio ${isSelected ? 'is-selected' : ''}`} aria-hidden="true" />
                         <span>{layoutPreset}</span>
@@ -3661,7 +3997,9 @@ function App() {
           >
             <button
               type="button"
-              className="global-chip global-chip-accent"
+              className={`global-chip global-chip-accent ${
+                activeStateOptionId === 'resolved' ? 'is-resolved-state' : ''
+              }`}
               aria-label="Select state"
               aria-expanded={isStateDrawerOpen}
               aria-controls="state-drawer"
@@ -3689,7 +4027,9 @@ function App() {
                       <button
                         type="button"
                         key={stateOption.id}
-                        className={`state-drawer-row ${stateOption.disabled ? 'is-disabled' : ''}`}
+                        className={`state-drawer-row ${stateOption.disabled ? 'is-disabled' : ''} ${
+                          stateOption.id === 'resolved' ? 'is-resolved' : ''
+                        }`}
                         role="option"
                         aria-selected={isSelected}
                         disabled={stateOption.disabled}
@@ -4016,32 +4356,7 @@ function App() {
           <div className="study-tree-body">{renderTree(visibleTreeNodes)}</div>
         </div>
 
-        <div className="body-outline">
-          <div className="body-silhouette-wrap">
-            <img className="body-puppet-svg" src={bodyPuppetImage} alt="" />
-
-            <div className="puppet-badges-layer">
-              {puppetBadgeDots.map(({ findingId, top, left }) => {
-                const isDotActive = activeFindingId === findingId && isViewerOpen
-
-                return (
-                  <span
-                    key={findingId}
-                    className={`puppet-badge-hitbox ${isDotActive ? 'is-active' : ''}`}
-                    style={{ top, left }}
-                  >
-                    <button
-                      type="button"
-                      className={`puppet-badge-dot ${isDotActive ? 'is-active' : ''}`}
-                      onClick={() => handlePuppetDotClick(findingId)}
-                      aria-label={`Select ${FINDINGS.find((entry) => entry.id === findingId)?.title ?? 'related finding'}`}
-                    />
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        {renderFindingMap()}
       </section>
 
       <button
@@ -4077,8 +4392,8 @@ function App() {
 
           <h2>
             {isViewerOpen
-              ? `${activeFinding.title} (${activeThumbnailIndex + 1}/${activeFindingThumbnails.length})`
-              : `Preview: Images (${THUMBNAILS.length})`}
+              ? `Preview: ${activeFinding.title} (${activeThumbnailIndex + 1}/${activeFindingThumbnails.length})`
+              : `Images (${THUMBNAILS.length})`}
           </h2>
 
           <div className="panel-header-actions">
@@ -4137,6 +4452,7 @@ function App() {
                   '--viewer-pan-x': `${viewerTransform.panX}px`,
                   '--viewer-pan-y': `${viewerTransform.panY}px`,
                   '--dot-inverse-scale': `${1 / viewerTransform.scale}`,
+                  '--viewer-square-size': viewerSquareSize ? `${viewerSquareSize}px` : undefined,
                 } as CSSProperties
               }
               onWheel={handleViewerWheel}
@@ -4185,6 +4501,7 @@ function App() {
 
               <div
                 className={`viewer-frame viewer-${activeThumbnail.id}`}
+                ref={viewerFrameRef}
                 onPointerDown={handleViewerPointerDown}
                 onPointerMove={handleViewerPointerMove}
                 onPointerUp={finishViewerPan}
@@ -4197,7 +4514,7 @@ function App() {
                 className="filmstrip-toggle filmstrip-toggle-floating"
                 aria-expanded={isViewerFilmstripVisible}
                 aria-controls="viewer-filmstrip"
-                onClick={() => setIsViewerFilmstripVisible((current) => !current)}
+                onClick={toggleFilmstripVisibility}
               >
                 <span
                   className="filmstrip-toggle-icon-wrap"
@@ -4233,7 +4550,7 @@ function App() {
                       openViewer(thumbnail.findingId, undefined, thumbnail.id)
                     }}
                   >
-                    <div className={`thumb-image thumb-${thumbnail.id}`} />
+                    <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                     <p>{thumbnail.label}</p>
                   </button>
                 ))}
@@ -4256,13 +4573,8 @@ function App() {
                   <header className="thumb-group-header">
                     <div className="thumb-group-title-wrap">
                       <span className="thumb-group-title">{group.title}</span>
-                      <span className="thumb-group-separator">/</span>
-                      <span className="thumb-group-source">Source name</span>
                     </div>
                     <span className="thumb-group-count">{groupThumbnails.length} images</span>
-                    <button type="button" className="thumb-group-menu-btn material-symbols-outlined" aria-label={`More options for ${group.title}`}>
-                      more_vert
-                    </button>
                   </header>
 
                   <div className="thumb-group-grid">
@@ -4273,7 +4585,7 @@ function App() {
                         className="thumb-card"
                         onClick={() => openViewer(thumbnail.findingId, undefined, thumbnail.id)}
                       >
-                        <div className={`thumb-image thumb-${thumbnail.id}`} />
+                        <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                         <p>{thumbnail.label}</p>
                       </button>
                     ))}
@@ -4291,7 +4603,7 @@ function App() {
                 className="thumb-card"
                 onClick={() => openViewer(thumbnail.findingId, undefined, thumbnail.id)}
               >
-                <div className={`thumb-image thumb-${thumbnail.id}`} />
+                <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                 <p>{thumbnail.label}</p>
               </button>
             ))}
@@ -4507,7 +4819,7 @@ function App() {
                               }}
                               aria-label={`Open ${finding.title} image ${thumbnail.label}`}
                             >
-                              <span className={`thumb-image thumb-${thumbnail.id}`} />
+                              <span className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                             </button>
                           ),
                         )}

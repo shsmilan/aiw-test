@@ -5,19 +5,33 @@ import type {
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
-import bodyPuppetImage from './assets/VA11A+ (Future concept with image viewer)/puppet/body.svg'
-import lungsImage from './assets/lungs.svg'
+import bodyPuppetSvg from './assets/VA11A+ (Future concept with image viewer)/puppet/body.svg?raw'
+import lungsSvg from './assets/lungs.svg?raw'
+import customSearchIcon from './assets/custom-search.svg'
+import customPatientIcon from './assets/custom-patient.svg'
+import brain01Image from './assets/images/brain 01.jpg'
+import brain02Image from './assets/images/brain 02.jpg'
+import brain03Image from './assets/images/brain 03.jpg'
+import brain04Image from './assets/images/brain 04.jpg'
+import skullUnfoldImage from './assets/images/skull unfold.jpg'
+import cervicalSpine01Image from './assets/images/cervical-spine_01.png'
+import midlineShiftImage from './assets/images/midline shift.gif'
+import pelvicInjuryImage from './assets/images/pelvic-injury.jpg'
+import legKneeImage from './assets/images/leg-knee.jpeg'
 import lung01Image from './assets/images/lung01.png'
-import aircScImage from './assets/images/airc_sc.jpg'
+import chestScImage from './assets/images/chest_sc.jpg'
 import './App.css'
 
 const STARTING_WIDTHS = [24, 48, 28]
 const MIN_SECTION_WIDTHS = [220, 340, 260]
 const DEDICATED_MIN_SECTION_WIDTHS = [160, 340, 260]
 const MOBILE_BREAKPOINT = 980
-const VIEWER_MIN_SCALE = 1.08
+const VIEWER_MIN_SCALE = 1
 const VIEWER_MAX_SCALE = 2.5
 const VIEWER_ZOOM_STEP = 0.0015
+const FILMSTRIP_DEFAULT_HEIGHT = 196
+const FILMSTRIP_MIN_HEIGHT = 120
+const FILMSTRIP_MAX_HEIGHT = 360
 
 type Divider = 0 | 1
 
@@ -40,6 +54,12 @@ type ViewerPanState = {
   startY: number
   startPanX: number
   startPanY: number
+}
+
+type FilmstripResizeState = {
+  pointerId: number
+  startY: number
+  startHeight: number
 }
 
 type ReviewFindingStatus = 'accepted' | 'rejected'
@@ -158,12 +178,7 @@ const THUMBNAILS: Thumbnail[] = [
   },
   { id: 'thumb-4', findingId: 'midline-shift', label: '1 • Midline shift', variant: 'midline' },
   { id: 'thumb-5', findingId: 'skull-fracture', label: '1 • Skull unfolding', variant: 'skull' },
-  { id: 'thumb-6', findingId: 'skull-fracture', label: '1 • Skull unfolding', variant: 'skull' },
-  { id: 'thumb-7', findingId: 'midline-shift', label: '1 • Midline shift', variant: 'midline' },
   { id: 'thumb-8', findingId: 'brain-hemorrhage', label: '1 • Brain hemorrhage', variant: 'brain' },
-  { id: 'thumb-9', findingId: 'cervical-spine-fracture', label: '1 • Cervical spine fracture', variant: 'cervical' },
-  { id: 'thumb-10', findingId: 'midline-shift', label: '1 • Midline shift', variant: 'midline' },
-  { id: 'thumb-11', findingId: 'skull-fracture', label: '1 • Skull unfolding', variant: 'skull' },
   { id: 'thumb-12', findingId: 'brain-hemorrhage', label: '1 • Brain hemorrhage', variant: 'brain' },
   { id: 'thumb-13', findingId: 'pelvic-free-fluid', label: '1 • Pelvic free fluid', variant: 'midline' },
   {
@@ -579,7 +594,7 @@ const CASE_WORKSPACE_DATA: Record<CaseTabId, CaseWorkspaceData> = {
         count: 2,
         children: [
           {
-            id: 'airc',
+            id: 'chest-ct',
             label: 'Chest CT',
             badges: [{ value: 2, tone: 'info' }],
             children: [
@@ -606,13 +621,13 @@ const CASE_WORKSPACE_DATA: Record<CaseTabId, CaseWorkspaceData> = {
     ],
     thumbnailGroups: [
       {
-        id: 'airc-chest-ct-lung-nodules',
-        title: 'AIRC - Chest CT / Lung nodules',
+        id: 'chest-ct-lung-nodules',
+        title: 'Chest CT / Lung nodules',
         findingIds: ['thorax-lung-nodules'],
       },
       {
-        id: 'airc-chest-ct-pulmonary-density',
-        title: 'AIRC - Chest CT / Pulmonary density',
+        id: 'chest-ct-pulmonary-density',
+        title: 'Chest CT / Pulmonary density',
         findingIds: ['thorax-pulmonary-density'],
       },
     ],
@@ -892,7 +907,7 @@ const WORKLIST_ROWS: WorklistRow[] = [
       { value: 5, tone: 'critical' },
       { value: 1, tone: 'info' },
     ],
-    state: 'opened',
+    state: 'visited',
   },
   {
     id: 'wl-andy-dwyer',
@@ -905,7 +920,7 @@ const WORKLIST_ROWS: WorklistRow[] = [
       'Lacus consequat consequat sint elementum malesuada aliquip senectus habitant non occaecat cupidatat repreheder...',
     protocol: 'Stroke',
     markers: [{ value: 2, tone: 'warning' }],
-    state: 'new',
+    state: 'visited',
   },
   {
     id: 'wl-tom-haverford',
@@ -1117,6 +1132,7 @@ function App() {
   const viewerFrameRef = useRef<HTMLDivElement>(null)
   const keyboardFindingNavigationRef = useRef(false)
   const viewerPanStateRef = useRef<ViewerPanState | null>(null)
+  const filmstripResizeStateRef = useRef<FilmstripResizeState | null>(null)
   const [sectionWidths, setSectionWidths] = useState(STARTING_WIDTHS)
   const [selectedTreeRowId, setSelectedTreeRowId] = useState<string | null>(null)
   const [activeGlobalTab, setActiveGlobalTab] = useState<'quick' | CaseTabId>('case-1')
@@ -1162,6 +1178,8 @@ function App() {
     useState<DedicatedLayoutOption>('1x1 Stack')
   const [activeStateOptionId, setActiveStateOptionId] = useState('opened')
   const [deletedFindingIds, setDeletedFindingIds] = useState<string[]>([])
+  const [hoveredIllustrationFindingId, setHoveredIllustrationFindingId] = useState<string | null>(null)
+  const [hoveredResultThumbnailId, setHoveredResultThumbnailId] = useState<string | null>(null)
   const [reviewFindingStatuses, setReviewFindingStatuses] = useState<
     Record<string, ReviewFindingStatus | undefined>
   >({})
@@ -1181,6 +1199,9 @@ function App() {
     panX: 0,
     panY: 0,
   })
+  const [viewerFilmstripHeight, setViewerFilmstripHeight] = useState(FILMSTRIP_DEFAULT_HEIGHT)
+  const [isFilmstripResizing, setIsFilmstripResizing] = useState(false)
+  const [isFilmstripResizeHover, setIsFilmstripResizeHover] = useState(false)
   const [viewerSquareSize, setViewerSquareSize] = useState<number | null>(null)
   const [selectedStudyIds, setSelectedStudyIds] = useState<string[]>(['ct-2026', 'ct-2025'])
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
@@ -1189,6 +1210,7 @@ function App() {
   const caseData = CASE_WORKSPACE_DATA[activeCaseTabId]
   const activeLayoutPreset = layoutPresetByCase[activeCaseTabId] ?? caseData.defaultLayoutPreset
   const isViewerFilmstripVisible = filmstripVisibilityByLayout[activeLayoutPreset] ?? true
+  const viewerFilmstripThumbSize = Math.min(Math.max(viewerFilmstripHeight - 46, 88), 260)
   const isLungScreeningTemplate = activeLayoutPreset === 'Lung Screening'
   const usesLungMap = isLungScreeningTemplate && caseData.anatomyVisualization === 'lungs'
   const FINDINGS = caseData.findings
@@ -1207,11 +1229,83 @@ function App() {
     FINDINGS.find((finding) => finding.id === activeFindingId) ?? FINDINGS[0]
   const activeThumbnail =
     THUMBNAILS.find((thumbnail) => thumbnail.id === activeThumbnailId) ?? THUMBNAILS[0]
+  const activeIllustrationHoverFindingId =
+    hoveredIllustrationFindingId !== null &&
+    FINDINGS.some((finding) => finding.id === hoveredIllustrationFindingId)
+      ? hoveredIllustrationFindingId
+      : null
+  const activeHoveredResultThumbnailId =
+    hoveredResultThumbnailId !== null &&
+    THUMBNAILS.some((thumbnail) => thumbnail.id === hoveredResultThumbnailId)
+      ? hoveredResultThumbnailId
+      : null
+  const isImageCardHovered = (thumbnail: Thumbnail): boolean => {
+    if (activeHoveredResultThumbnailId !== null) {
+      return thumbnail.id === activeHoveredResultThumbnailId
+    }
+
+    return activeIllustrationHoverFindingId === thumbnail.findingId
+  }
+  const findingOrderById: Record<string, number> = Object.fromEntries(
+    FINDINGS.map((finding, index) => [finding.id, index]),
+  )
+  const thumbnailOrderById: Record<string, number> = Object.fromEntries(
+    THUMBNAILS.map((thumbnail, index) => [thumbnail.id, index]),
+  )
+  const sortThumbnailsByResultOrder = (thumbnails: Thumbnail[]): Thumbnail[] =>
+    [...thumbnails].sort((first, second) => {
+      const firstFindingOrder = findingOrderById[first.findingId] ?? Number.MAX_SAFE_INTEGER
+      const secondFindingOrder = findingOrderById[second.findingId] ?? Number.MAX_SAFE_INTEGER
+
+      if (firstFindingOrder !== secondFindingOrder) {
+        return firstFindingOrder - secondFindingOrder
+      }
+
+      const firstThumbnailOrder = thumbnailOrderById[first.id] ?? Number.MAX_SAFE_INTEGER
+      const secondThumbnailOrder = thumbnailOrderById[second.id] ?? Number.MAX_SAFE_INTEGER
+
+      return firstThumbnailOrder - secondThumbnailOrder
+    })
   const activeFindingThumbnails = THUMBNAILS.filter(
     (thumbnail) => thumbnail.findingId === activeFinding.id,
   )
+  const orderedThumbnails = sortThumbnailsByResultOrder(THUMBNAILS)
+  const orderedWorklistRows = WORKLIST_ROWS.map((row, index) => ({ row, index }))
+    .sort((first, second) => {
+      const firstPriority = first.row.state === 'processing' ? 0 : 1
+      const secondPriority = second.row.state === 'processing' ? 0 : 1
+
+      if (firstPriority !== secondPriority) {
+        return firstPriority - secondPriority
+      }
+
+      return first.index - second.index
+    })
+    .map(({ row }) => row)
   const activeDedicatedFindings = IMAGE_FINDINGS_BY_THUMBNAIL[activeThumbnail.id] ?? []
   const getThumbnailImageStyle = (thumbnailId: string): CSSProperties | undefined => {
+    const imageByThumbnailId: Record<string, string> = {
+      'thumb-1': brain01Image,
+      'thumb-2': brain02Image,
+      'thumb-3': cervicalSpine01Image,
+      'thumb-4': midlineShiftImage,
+      'thumb-5': skullUnfoldImage,
+      'thumb-8': brain03Image,
+      'thumb-12': brain04Image,
+      'thumb-13': pelvicInjuryImage,
+      'thumb-14': legKneeImage,
+    }
+
+    const mappedImage = imageByThumbnailId[thumbnailId]
+    if (mappedImage) {
+      return {
+        backgroundImage: `url(${mappedImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    }
+
     if (
       thumbnailId === 'thumb-case2-thorax-1' ||
       thumbnailId === 'thumb-case2-thorax-3' ||
@@ -1227,7 +1321,7 @@ function App() {
 
     if (thumbnailId === 'thumb-case2-thorax-2') {
       return {
-        backgroundImage: `url(${aircScImage})`,
+        backgroundImage: `url(${chestScImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -1252,6 +1346,22 @@ function App() {
     FINDINGS.some((finding) => finding.id === findingId),
   )
 
+  const startFindingHover = (findingId: string | null | undefined) => {
+    if (!findingId || !FINDINGS.some((finding) => finding.id === findingId)) {
+      return
+    }
+
+    setHoveredIllustrationFindingId(findingId)
+  }
+
+  const endFindingHover = (findingId: string | null | undefined) => {
+    if (!findingId) {
+      return
+    }
+
+    setHoveredIllustrationFindingId((current) => (current === findingId ? null : current))
+  }
+
   const selectLayoutPreset = (layoutPreset: LayoutPreset) => {
     setLayoutPresetByCase((current) => ({
       ...current,
@@ -1266,28 +1376,94 @@ function App() {
     }))
   }
 
+  const handleFilmstripResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsFilmstripResizing(true)
+
+    filmstripResizeStateRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startHeight: viewerFilmstripHeight,
+    }
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const resizeState = filmstripResizeStateRef.current
+      if (!resizeState || moveEvent.pointerId !== resizeState.pointerId) {
+        return
+      }
+
+      const deltaY = moveEvent.clientY - resizeState.startY
+      const nextHeight = Math.min(
+        Math.max(resizeState.startHeight - deltaY, FILMSTRIP_MIN_HEIGHT),
+        FILMSTRIP_MAX_HEIGHT,
+      )
+
+      setViewerFilmstripHeight(nextHeight)
+    }
+
+    const finishResize = (finishEvent: PointerEvent) => {
+      const resizeState = filmstripResizeStateRef.current
+      if (!resizeState || finishEvent.pointerId !== resizeState.pointerId) {
+        return
+      }
+
+      filmstripResizeStateRef.current = null
+      setIsFilmstripResizing(false)
+      setIsFilmstripResizeHover(false)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', finishResize)
+      window.removeEventListener('pointercancel', finishResize)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', finishResize)
+    window.addEventListener('pointercancel', finishResize)
+  }
+
   const renderFindingMap = () => {
-    const anatomyImage = usesLungMap ? lungsImage : bodyPuppetImage
+    const anatomySvg = usesLungMap ? lungsSvg : bodyPuppetSvg
     const anatomyClassName = usesLungMap ? 'lungs-map-svg' : 'body-puppet-svg'
 
     return (
       <div className={`body-outline ${usesLungMap ? 'body-outline-lungs' : ''}`}>
         <div className={`body-silhouette-wrap ${usesLungMap ? 'lungs-silhouette-wrap' : ''}`}>
-          <img className={anatomyClassName} src={anatomyImage} alt="" />
+          <div
+            className={anatomyClassName}
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: anatomySvg }}
+          />
 
           <div className={`puppet-badges-layer ${usesLungMap ? 'lungs-badges-layer' : ''}`}>
             {puppetBadgeDots.map(({ findingId, top, left }, index) => {
               const isDotActive = activeFindingId === findingId && isViewerOpen
+              const isDotHovered = activeIllustrationHoverFindingId === findingId
 
               return (
                 <span
                   key={`${findingId}-${index}`}
-                  className={`puppet-badge-hitbox ${isDotActive ? 'is-active' : ''}`}
+                  className={`puppet-badge-hitbox ${isDotActive ? 'is-active' : ''} ${
+                    isDotHovered ? 'is-hovered' : ''
+                  }`}
                   style={{ top, left }}
+                  onMouseEnter={() => {
+                    startFindingHover(findingId)
+                  }}
+                  onMouseLeave={() => {
+                    endFindingHover(findingId)
+                  }}
+                  onFocus={() => {
+                    startFindingHover(findingId)
+                  }}
+                  onBlur={() => {
+                    endFindingHover(findingId)
+                  }}
                 >
                   <button
                     type="button"
-                    className={`puppet-badge-dot ${isDotActive ? 'is-active' : ''}`}
+                    className={`puppet-badge-dot ${isDotActive ? 'is-active' : ''} ${
+                      isDotHovered ? 'is-hovered' : ''
+                    }`}
                     onClick={() => handlePuppetDotClick(findingId)}
                     aria-label={`Select ${FINDINGS.find((entry) => entry.id === findingId)?.title ?? 'related finding'}`}
                   />
@@ -1723,8 +1899,13 @@ function App() {
     return Boolean(selection && selection.toString().trim())
   }
 
+  const activeThumbnailImageStyle = getThumbnailImageStyle(activeThumbnail.id)
+  const hasRasterViewerImage = Boolean(getThumbnailImageStyle(activeThumbnail.id))
+  const viewerMinScale = 1
+  const viewerMaxScale = hasRasterViewerImage ? VIEWER_MAX_SCALE : 1
+
   const clampViewerScale = (scale: number) =>
-    Math.min(VIEWER_MAX_SCALE, Math.max(VIEWER_MIN_SCALE, scale))
+    Math.min(viewerMaxScale, Math.max(viewerMinScale, scale))
 
   const adjustViewerScale = (direction: -1 | 1) => {
     setViewerTransform((current) => ({
@@ -1972,6 +2153,20 @@ function App() {
     }))
   }
 
+  const restoreDedicatedFindingReviewState = (thumbnailId: string, findingId: string) => {
+    const statusKey = `${thumbnailId}::${findingId}`
+
+    setReviewFindingStatuses((current) => ({
+      ...current,
+      [statusKey]: undefined,
+    }))
+
+    setDeletedDedicatedFindings((current) => ({
+      ...current,
+      [statusKey]: false,
+    }))
+  }
+
   const acceptAllDedicatedFindings = (thumbnailId: string, findings: ImageFinding[]) => {
     setReviewFindingStatuses((current) => {
       const next = { ...current }
@@ -2121,6 +2316,10 @@ function App() {
           const targetThumbnailId = node.thumbnailId ?? findFirstThumbnailId(node)
           const isSelectableFinding = Boolean(node.findingId || node.thumbnailId) && !hasChildren
           const isSelected = isSelectableFinding && selectedTreeRowId === node.id
+          const isHovered =
+            isSelectableFinding &&
+            Boolean(targetFindingId) &&
+            targetFindingId === activeIllustrationHoverFindingId
           const folderItemCount = isFolderRow ? countItemsInFolder(node) : null
           const labelText = node.label
 
@@ -2132,7 +2331,7 @@ function App() {
               aria-expanded={hasChildren ? expanded : undefined}
             >
               <div
-                className={`tree-row ${isSelected ? 'is-selected' : ''}`}
+                className={`tree-row ${isSelected ? 'is-selected' : ''} ${isHovered ? 'is-hovered' : ''}`}
                 style={{ '--tree-depth': depth } as CSSProperties}
               >
                 {hasChildren && !isStudyRow ? (
@@ -2159,6 +2358,18 @@ function App() {
                   className={`tree-select ${isSelected ? 'is-selected' : ''} ${
                     isStudyRow ? 'tree-select-study' : ''
                   }`}
+                  onMouseEnter={() => {
+                    startFindingHover(targetFindingId)
+                  }}
+                  onMouseLeave={() => {
+                    endFindingHover(targetFindingId)
+                  }}
+                  onFocus={() => {
+                    startFindingHover(targetFindingId)
+                  }}
+                  onBlur={() => {
+                    endFindingHover(targetFindingId)
+                  }}
                   onClick={(event) => {
                     if (event.detail > 1) {
                       return
@@ -2579,9 +2790,12 @@ function App() {
               aria-label="Open quick tab"
               onClick={() => setActiveGlobalTab('quick')}
             >
-              <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-                search
-              </span>
+              <img
+                src={customSearchIcon}
+                className="global-tab-person global-tab-person-image"
+                aria-hidden="true"
+                alt=""
+              />
             </button>
 
             {CASE_TABS.filter((tab) => openCaseTabIds.includes(tab.id)).map((tab) => (
@@ -2592,9 +2806,12 @@ function App() {
                   aria-label={`Open ${tab.name}`}
                   onClick={() => setActiveGlobalTab(tab.id)}
                 >
-                  <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-                    man
-                  </span>
+                  <img
+                    src={customPatientIcon}
+                    className="global-tab-person global-tab-person-image"
+                    aria-hidden="true"
+                    alt=""
+                  />
                   <span className="global-tab-copy">
                     <span className="global-tab-title">{tab.name}</span>
                     <span className="global-tab-meta">{tab.meta}</span>
@@ -2867,7 +3084,7 @@ function App() {
               <span className="worklist-cell" role="columnheader">State</span>
             </div>
 
-            {WORKLIST_ROWS.map((row) => {
+            {orderedWorklistRows.map((row) => {
               const liesInCase2 = row.patientName === 'April Ludgate' || row.patientName === 'Ben Wyatt'
               const isProcessing = row.state === 'processing'
               const linkedCaseId: CaseTabId = liesInCase2 ? 'case-2' : 'case-1'
@@ -2909,14 +3126,19 @@ function App() {
                   <span className="worklist-cell" role="cell">{row.protocol}</span>
                   <span className="worklist-cell worklist-cell-markers" role="cell">
                     {isProcessing ? (
-                      <span className="worklist-marker-spinner" aria-label="Processing" />
+                      <span className="worklist-processing-dash" aria-label="Not available">
+                        –
+                      </span>
                     ) : (
                       <span className="worklist-findings-count">{findingCount}</span>
                     )}
                   </span>
                   <span className="worklist-cell" role="cell">
                     {row.state === 'processing' ? (
-                      <span className="worklist-state-spinner" aria-label="Processing" />
+                      <span className="worklist-state-processing" aria-label="Processing">
+                        <span className="worklist-state-spinner" aria-hidden="true" />
+                        <span className="worklist-state-processing-text">Processing</span>
+                      </span>
                     ) : (
                       <span className={`worklist-state-pill worklist-state-${row.state}`}>
                         {WORKLIST_STATE_LABELS[row.state]}
@@ -3012,9 +3234,12 @@ function App() {
               aria-label="Open quick tab"
               onClick={() => setActiveGlobalTab('quick')}
             >
-              <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-                search
-              </span>
+              <img
+                src={customSearchIcon}
+                className="global-tab-person global-tab-person-image"
+                aria-hidden="true"
+                alt=""
+              />
             </button>
 
             {CASE_TABS.filter((tab) => openCaseTabIds.includes(tab.id)).map((tab) => (
@@ -3025,9 +3250,12 @@ function App() {
                   aria-label={`Open ${tab.name}`}
                   onClick={() => setActiveGlobalTab(tab.id)}
                 >
-                  <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-                    man
-                  </span>
+                  <img
+                    src={customPatientIcon}
+                    className="global-tab-person global-tab-person-image"
+                    aria-hidden="true"
+                    alt=""
+                  />
                   <span className="global-tab-copy">
                     <span className="global-tab-title">{tab.name}</span>
                     <span className="global-tab-meta">{tab.meta}</span>
@@ -3199,13 +3427,35 @@ function App() {
 
             {activeDedicatedLeftTab === 'images' ? (
               <div className="review-image-list">
-                {THUMBNAILS.map((thumbnail) => (
+                {orderedThumbnails.map((thumbnail) => (
                   <button
                     type="button"
                     key={thumbnail.id}
-                    className={`thumb-card review-image-card ${activeThumbnail.id === thumbnail.id ? 'is-active' : ''}`}
+                    className={`thumb-card review-image-card ${activeThumbnail.id === thumbnail.id ? 'is-active' : ''} ${
+                      isImageCardHovered(thumbnail) ? 'is-hovered' : ''
+                    }`}
                     ref={(element) => {
                       reviewImageCardRefs.current[thumbnail.id] = element
+                    }}
+                    onMouseEnter={() => {
+                      startFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId(thumbnail.id)
+                    }}
+                    onMouseLeave={() => {
+                      endFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId((current) =>
+                        current === thumbnail.id ? null : current,
+                      )
+                    }}
+                    onFocus={() => {
+                      startFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId(thumbnail.id)
+                    }}
+                    onBlur={() => {
+                      endFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId((current) =>
+                        current === thumbnail.id ? null : current,
+                      )
                     }}
                     onClick={() => selectDedicatedThumbnail(thumbnail.id)}
                   >
@@ -3227,12 +3477,26 @@ function App() {
                       <li key={finding.id}>
                         <article
                           className={`result-card ${activeFinding.id === finding.id && isViewerOpen ? 'is-selected' : ''} ${
-                            isDeleted ? 'is-deleted' : ''
-                          }`}
+                            activeIllustrationHoverFindingId === finding.id ? 'is-hovered' : ''
+                          } ${isDeleted ? 'is-deleted' : ''}`}
                           role={isDeleted ? undefined : 'button'}
                           tabIndex={isDeleted ? -1 : 0}
                           ref={(element) => {
                             resultCardRefs.current[finding.id] = element
+                          }}
+                          onMouseEnter={() => {
+                            startFindingHover(finding.id)
+                          }}
+                          onMouseLeave={() => {
+                            endFindingHover(finding.id)
+                            setHoveredResultThumbnailId(null)
+                          }}
+                          onFocus={() => {
+                            startFindingHover(finding.id)
+                          }}
+                          onBlur={() => {
+                            endFindingHover(finding.id)
+                            setHoveredResultThumbnailId(null)
                           }}
                           onPointerDown={isDeleted ? undefined : handleResultCardPointerDown}
                           onPointerUp={isDeleted ? undefined : () => handleResultCardPointerUp(finding.id, finding.nodeId)}
@@ -3254,7 +3518,8 @@ function App() {
                             <>
                               <div className="result-card-deleted-row">
                                 <p className="result-card-deleted-title">
-                                  Deleted: <span>{finding.title}</span>
+                                  <span className="deleted-finding-title">{finding.title}</span>
+                                  <span className="deleted-status-suffix"> - Deleted</span>
                                 </p>
                               </div>
 
@@ -3339,7 +3604,7 @@ function App() {
                                     )
                                   }}
                                 >
-                                  open_in_new
+                                  edit_square
                                 </button>
                                 <button
                                   type="button"
@@ -3364,7 +3629,12 @@ function App() {
                                 <span className="result-metric-value">{finding.metric}</span>
                               </p>
                               {showResultThumbnails ? (
-                                <div className="result-thumbs">
+                                <div
+                                  className="result-thumbs"
+                                  onMouseLeave={() => {
+                                    setHoveredResultThumbnailId(null)
+                                  }}
+                                >
                                   {THUMBNAILS.filter((thumbnail) => thumbnail.findingId === finding.id).map(
                                     (thumbnail) => (
                                       <button
@@ -3372,12 +3642,27 @@ function App() {
                                         key={`${finding.id}-${thumbnail.id}`}
                                         className={`result-thumb-item ${
                                           activeThumbnail.id === thumbnail.id && isViewerOpen ? 'is-active' : ''
+                                        } ${
+                                          hoveredResultThumbnailId === thumbnail.id ? 'is-hovered' : ''
                                         }`}
                                         onPointerDown={(event) => {
                                           event.stopPropagation()
                                         }}
                                         onPointerUp={(event) => {
                                           event.stopPropagation()
+                                        }}
+                                        onMouseEnter={() => {
+                                          startFindingHover(thumbnail.findingId)
+                                          setHoveredResultThumbnailId(thumbnail.id)
+                                        }}
+                                        onFocus={() => {
+                                          startFindingHover(thumbnail.findingId)
+                                          setHoveredResultThumbnailId(thumbnail.id)
+                                        }}
+                                        onBlur={() => {
+                                          setHoveredResultThumbnailId((current) =>
+                                            current === thumbnail.id ? null : current,
+                                          )
                                         }}
                                         onClick={(event) => {
                                           event.stopPropagation()
@@ -3552,7 +3837,12 @@ function App() {
                 }}
               >
                 <div
-                  className={`viewer-frame viewer-${activeThumbnail.id}`}
+                  className={`viewer-frame viewer-${activeThumbnail.id} ${hasRasterViewerImage ? 'has-raster' : ''}`}
+                  style={
+                    activeThumbnailImageStyle?.backgroundImage
+                      ? ({ '--viewer-image': activeThumbnailImageStyle.backgroundImage } as CSSProperties)
+                      : undefined
+                  }
                   ref={viewerFrameRef}
                   onPointerDown={handleViewerPointerDown}
                   onPointerMove={handleViewerPointerMove}
@@ -3616,12 +3906,7 @@ function App() {
                           selectDedicatedFinding(activeThumbnail.id, finding.id)
                         }}
                       >
-                        <span
-                          className={`review-finding-dot-label ${
-                            Number.parseFloat(finding.left) > 58 ? 'is-left' : 'is-right'
-                          }`}
-                          aria-hidden="true"
-                        >
+                        <span className="review-finding-dot-label is-right" aria-hidden="true">
                           {`${finding.label} *AI`}
                         </span>
                       </button>
@@ -3755,7 +4040,8 @@ function App() {
                             <div className="review-finding-main">
                               <span className="review-finding-index" aria-hidden="true">{`[L${index + 1}]`}</span>
                               <p className="review-deleted-title">
-                                Deleted: <span>{findingTitle}</span>
+                                <span className="deleted-finding-title">{findingTitle}</span>
+                                <span className="deleted-status-suffix"> - Deleted</span>
                               </p>
                             </div>
                           </div>
@@ -3775,6 +4061,21 @@ function App() {
                               }}
                             >
                               undo
+                            </button>
+                            <button
+                              type="button"
+                              className="result-card-action-btn material-symbols-outlined"
+                              tabIndex={-1}
+                              aria-label={`Finding info for ${finding.label}`}
+                              onMouseDown={stopActionEvent}
+                              onPointerDown={stopActionEvent}
+                              onPointerUp={stopActionEvent}
+                              onClick={(event) => {
+                                stopActionEvent(event)
+                                openFindingInfoModal(finding.label)
+                              }}
+                            >
+                              info
                             </button>
                           </div>
 
@@ -3816,7 +4117,25 @@ function App() {
                             more_vert
                           </button>
 
-                          {reviewStatus !== 'accepted' ? (
+                          {isAccepted ? (
+                            <div className="result-card-actions" aria-hidden="true">
+                              <button
+                                type="button"
+                                className="result-card-action-btn result-card-undo-btn material-symbols-outlined"
+                                tabIndex={-1}
+                                aria-label={`Restore ${finding.label}`}
+                                onMouseDown={stopActionEvent}
+                                onPointerDown={stopActionEvent}
+                                onPointerUp={stopActionEvent}
+                                onClick={(event) => {
+                                  stopActionEvent(event)
+                                  restoreDedicatedFindingReviewState(activeThumbnail.id, finding.id)
+                                }}
+                              >
+                                undo
+                              </button>
+                            </div>
+                          ) : (
                             <div className="result-card-actions" aria-hidden="true">
                               <button
                                 type="button"
@@ -3852,7 +4171,7 @@ function App() {
                                 delete
                               </button>
                             </div>
-                          ) : null}
+                          )}
 
                           <div className="review-finding-main">
                             <span className="review-finding-index" aria-hidden="true">{`[L${index + 1}]`}</span>
@@ -3862,7 +4181,7 @@ function App() {
                                 {showAiSuffix ? (
                                   <span className="review-finding-ai-suffix"> - *AI finding</span>
                                 ) : isAccepted ? (
-                                  <span> - Accepted</span>
+                                  <span className="review-finding-accepted-suffix"> - Accepted</span>
                                 ) : null}
                               </h3>
                               <p>{finding.description}</p>
@@ -3892,9 +4211,12 @@ function App() {
             aria-label="Open quick tab"
             onClick={() => setActiveGlobalTab('quick')}
           >
-            <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-              search
-            </span>
+            <img
+              src={customSearchIcon}
+              className="global-tab-person global-tab-person-image"
+              aria-hidden="true"
+              alt=""
+            />
           </button>
 
           {CASE_TABS.filter((tab) => openCaseTabIds.includes(tab.id)).map((tab) => (
@@ -3905,9 +4227,12 @@ function App() {
                 aria-label={`Open ${tab.name}`}
                 onClick={() => setActiveGlobalTab(tab.id)}
               >
-                <span className="global-tab-person material-symbols-outlined" aria-hidden="true">
-                  man
-                </span>
+                <img
+                  src={customPatientIcon}
+                  className="global-tab-person global-tab-person-image"
+                  aria-hidden="true"
+                  alt=""
+                />
                 <span className="global-tab-copy">
                   <span className="global-tab-title">{tab.name}</span>
                   <span className="global-tab-meta">{tab.meta}</span>
@@ -4464,7 +4789,7 @@ function App() {
                 onClick={openDedicatedViewer}
               >
                 <span className="material-symbols-outlined viewer-chip-icon" aria-hidden="true">
-                  open_in_new
+                  edit_square
                 </span>
                 <span>Inspect</span>
               </button>
@@ -4500,7 +4825,12 @@ function App() {
               </div>
 
               <div
-                className={`viewer-frame viewer-${activeThumbnail.id}`}
+                className={`viewer-frame viewer-${activeThumbnail.id} ${hasRasterViewerImage ? 'has-raster' : ''}`}
+                style={
+                  activeThumbnailImageStyle?.backgroundImage
+                    ? ({ '--viewer-image': activeThumbnailImageStyle.backgroundImage } as CSSProperties)
+                    : undefined
+                }
                 ref={viewerFrameRef}
                 onPointerDown={handleViewerPointerDown}
                 onPointerMove={handleViewerPointerMove}
@@ -4532,15 +4862,32 @@ function App() {
 
             <div
               id="viewer-filmstrip"
-              className={`filmstrip-shell ${isViewerFilmstripVisible ? 'is-open' : ''}`}
+              className={`filmstrip-shell ${isViewerFilmstripVisible ? 'is-open' : ''} ${
+                isFilmstripResizing ? 'is-resizing' : ''
+              } ${isFilmstripResizeHover ? 'is-resize-hover' : ''}`}
               aria-hidden={!isViewerFilmstripVisible}
+              style={
+                {
+                  '--filmstrip-height': `${viewerFilmstripHeight}px`,
+                  '--filmstrip-thumb-size': `${viewerFilmstripThumbSize}px`,
+                } as CSSProperties
+              }
             >
+              <div
+                className="filmstrip-resize-hitbox"
+                aria-hidden="true"
+                onPointerDown={handleFilmstripResizePointerDown}
+                onPointerEnter={() => setIsFilmstripResizeHover(true)}
+                onPointerLeave={() => setIsFilmstripResizeHover(false)}
+              />
               <div className="filmstrip">
                 {activeFindingThumbnails.map((thumbnail) => (
                   <button
                     type="button"
                     key={thumbnail.id}
-                    className={`thumb-card ${activeThumbnail.id === thumbnail.id ? 'is-active' : ''}`}
+                    className={`thumb-card ${activeThumbnail.id === thumbnail.id ? 'is-active' : ''} ${
+                      isImageCardHovered(thumbnail) ? 'is-hovered' : ''
+                    }`}
                     onClick={() => {
                       if (activeThumbnail.id === thumbnail.id) {
                         closeViewer()
@@ -4548,6 +4895,26 @@ function App() {
                       }
 
                       openViewer(thumbnail.findingId, undefined, thumbnail.id)
+                    }}
+                    onMouseEnter={() => {
+                      startFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId(thumbnail.id)
+                    }}
+                    onMouseLeave={() => {
+                      endFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId((current) =>
+                        current === thumbnail.id ? null : current,
+                      )
+                    }}
+                    onFocus={() => {
+                      startFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId(thumbnail.id)
+                    }}
+                    onBlur={() => {
+                      endFindingHover(thumbnail.findingId)
+                      setHoveredResultThumbnailId((current) =>
+                        current === thumbnail.id ? null : current,
+                      )
                     }}
                   >
                     <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
@@ -4560,8 +4927,8 @@ function App() {
         ) : isGroupedThumbView ? (
           <div className="grouped-thumb-view">
             {THUMBNAIL_GROUPS.map((group) => {
-              const groupThumbnails = THUMBNAILS.filter((thumbnail) =>
-                group.findingIds.includes(thumbnail.findingId),
+              const groupThumbnails = sortThumbnailsByResultOrder(
+                THUMBNAILS.filter((thumbnail) => group.findingIds.includes(thumbnail.findingId)),
               )
 
               if (groupThumbnails.length === 0) {
@@ -4582,8 +4949,30 @@ function App() {
                       <button
                         type="button"
                         key={thumbnail.id}
-                        className="thumb-card"
+                        className={`thumb-card ${
+                          isImageCardHovered(thumbnail) ? 'is-hovered' : ''
+                        }`}
                         onClick={() => openViewer(thumbnail.findingId, undefined, thumbnail.id)}
+                        onMouseEnter={() => {
+                          startFindingHover(thumbnail.findingId)
+                          setHoveredResultThumbnailId(thumbnail.id)
+                        }}
+                        onMouseLeave={() => {
+                          endFindingHover(thumbnail.findingId)
+                          setHoveredResultThumbnailId((current) =>
+                            current === thumbnail.id ? null : current,
+                          )
+                        }}
+                        onFocus={() => {
+                          startFindingHover(thumbnail.findingId)
+                          setHoveredResultThumbnailId(thumbnail.id)
+                        }}
+                        onBlur={() => {
+                          endFindingHover(thumbnail.findingId)
+                          setHoveredResultThumbnailId((current) =>
+                            current === thumbnail.id ? null : current,
+                          )
+                        }}
                       >
                         <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                         <p>{thumbnail.label}</p>
@@ -4596,12 +4985,34 @@ function App() {
           </div>
         ) : (
           <div className="thumb-grid">
-            {THUMBNAILS.map((thumbnail) => (
+            {sortThumbnailsByResultOrder(THUMBNAILS).map((thumbnail) => (
               <button
                 type="button"
                 key={thumbnail.id}
-                className="thumb-card"
+                className={`thumb-card ${
+                  isImageCardHovered(thumbnail) ? 'is-hovered' : ''
+                }`}
                 onClick={() => openViewer(thumbnail.findingId, undefined, thumbnail.id)}
+                onMouseEnter={() => {
+                  startFindingHover(thumbnail.findingId)
+                  setHoveredResultThumbnailId(thumbnail.id)
+                }}
+                onMouseLeave={() => {
+                  endFindingHover(thumbnail.findingId)
+                  setHoveredResultThumbnailId((current) =>
+                    current === thumbnail.id ? null : current,
+                  )
+                }}
+                onFocus={() => {
+                  startFindingHover(thumbnail.findingId)
+                  setHoveredResultThumbnailId(thumbnail.id)
+                }}
+                onBlur={() => {
+                  endFindingHover(thumbnail.findingId)
+                  setHoveredResultThumbnailId((current) =>
+                    current === thumbnail.id ? null : current,
+                  )
+                }}
               >
                 <div className={`thumb-image ${thumbnail.id}`} style={getThumbnailImageStyle(thumbnail.id)} />
                 <p>{thumbnail.label}</p>
@@ -4655,12 +5066,26 @@ function App() {
             <li key={finding.id}>
               <article
                 className={`result-card ${activeFinding.id === finding.id && isViewerOpen ? 'is-selected' : ''} ${
-                  isDeleted ? 'is-deleted' : ''
-                }`}
+                  activeIllustrationHoverFindingId === finding.id ? 'is-hovered' : ''
+                } ${isDeleted ? 'is-deleted' : ''}`}
                 role={isDeleted ? undefined : 'button'}
                 tabIndex={isDeleted ? -1 : 0}
                 ref={(element) => {
                   resultCardRefs.current[finding.id] = element
+                }}
+                onMouseEnter={() => {
+                  startFindingHover(finding.id)
+                }}
+                onMouseLeave={() => {
+                  endFindingHover(finding.id)
+                  setHoveredResultThumbnailId(null)
+                }}
+                onFocus={() => {
+                  startFindingHover(finding.id)
+                }}
+                onBlur={() => {
+                  endFindingHover(finding.id)
+                  setHoveredResultThumbnailId(null)
                 }}
                 onPointerDown={isDeleted ? undefined : handleResultCardPointerDown}
                 onPointerUp={isDeleted ? undefined : () => handleResultCardPointerUp(finding.id, finding.nodeId)}
@@ -4682,7 +5107,8 @@ function App() {
                   <>
                     <div className="result-card-deleted-row">
                       <p className="result-card-deleted-title">
-                        Deleted: <span>{finding.title}</span>
+                        <span className="deleted-finding-title">{finding.title}</span>
+                        <span className="deleted-status-suffix"> - Deleted</span>
                       </p>
                     </div>
 
@@ -4767,7 +5193,7 @@ function App() {
                           )
                         }}
                       >
-                        open_in_new
+                        edit_square
                       </button>
                       <button
                         type="button"
@@ -4792,7 +5218,12 @@ function App() {
                       <span className="result-metric-value">{finding.metric}</span>
                     </p>
                     {showResultThumbnails ? (
-                      <div className="result-thumbs">
+                      <div
+                        className="result-thumbs"
+                        onMouseLeave={() => {
+                          setHoveredResultThumbnailId(null)
+                        }}
+                      >
                         {THUMBNAILS.filter((thumbnail) => thumbnail.findingId === finding.id).map(
                           (thumbnail) => (
                             <button
@@ -4800,12 +5231,27 @@ function App() {
                               key={`${finding.id}-${thumbnail.id}`}
                               className={`result-thumb-item ${
                                 activeThumbnail.id === thumbnail.id && isViewerOpen ? 'is-active' : ''
+                              } ${
+                                hoveredResultThumbnailId === thumbnail.id ? 'is-hovered' : ''
                               }`}
                               onPointerDown={(event) => {
                                 event.stopPropagation()
                               }}
                               onPointerUp={(event) => {
                                 event.stopPropagation()
+                              }}
+                              onMouseEnter={() => {
+                                startFindingHover(thumbnail.findingId)
+                                setHoveredResultThumbnailId(thumbnail.id)
+                              }}
+                              onFocus={() => {
+                                startFindingHover(thumbnail.findingId)
+                                setHoveredResultThumbnailId(thumbnail.id)
+                              }}
+                              onBlur={() => {
+                                setHoveredResultThumbnailId((current) =>
+                                  current === thumbnail.id ? null : current,
+                                )
                               }}
                               onClick={(event) => {
                                 event.stopPropagation()
